@@ -1483,4 +1483,4 @@ async function boot() {
     route(activeRoute || "home", true);
   }, REFRESH_MS);
 }
-boot();
+window.addEventListener("DOMContentLoaded", boot);

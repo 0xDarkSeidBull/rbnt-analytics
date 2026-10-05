@@ -20,6 +20,7 @@ from jobs import market as j_market
 from jobs import cex as j_cex
 from jobs import transfers as j_transfers
 from jobs import native as j_native
+from jobs import native_chain as j_native_chain
 
 log = logging.getLogger("poller")
 
@@ -42,6 +43,11 @@ JOBS = {
     "transfers": lambda: j_transfers.sync(max_chunks=40),
     "native_holders": lambda: j_native.run(),
     "prune": lambda: _prune(),
+    "native_supply": lambda: j_native_chain.supply(),
+    "native_scan": lambda: j_native_chain.scan_forward(),
+    "native_backfill": lambda: j_native_chain.scan_backward(),
+    "native_wraps": lambda: j_native_chain.wraps(),
+    "native_rich": lambda: j_native_chain.richlist(),
 }
 
 
@@ -87,6 +93,11 @@ def build_scheduler():
         "transfers": ("claims", 30),      # piggyback claims cadence; incremental
         "native_holders": ("holders", 60),
         "prune": ("holders", 3600),
+        "native_supply": ("native_supply", 40),
+        "native_scan": ("native_scan", 25),
+        "native_backfill": ("native_backfill", 200),
+        "native_wraps": ("native_wraps", 80),
+        "native_rich": ("native_rich", 400),
     }
     for name, (key, delay) in every.items():
         secs = SCHEDULE[key] if key else 3600

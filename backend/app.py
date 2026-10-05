@@ -335,6 +335,10 @@ def system():
     return {"schedule": SCHEDULE, "recent_runs": [dict(r) for r in runs], "row_counts": counts}
 
 
+from native_api import router as native_router
+app.include_router(native_router)
+
+
 @app.get("/")
 def index():
     return FileResponse("static/index.html")

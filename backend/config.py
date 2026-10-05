@@ -61,3 +61,23 @@ SCHEDULE = {
 }
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "rbnt.db")
+
+# ---------- Native RBNT ----------
+ROUTESCAN_V2 = "https://api.routescan.io/v2/network/mainnet/evm/151"
+# WETH9-style wrap/unwrap events on WRBNT
+TOPIC_WRBNT_DEPOSIT = "0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c"
+TOPIC_WRBNT_WITHDRAWAL = "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65"
+NATIVE_FIRST_WINDOW_BLOCKS = 50000   # forward scan starts ~30 days back (avg block ~57s)
+NATIVE_FWD_MAX_BLOCKS = 3000         # per forward run
+NATIVE_BACK_MAX_BLOCKS = 6000        # per backfill run (walks down to genesis)
+NATIVE_RPC_BATCH = 50                # blocks per JSON-RPC batch
+NATIVE_WHALE_RBNT = 1_000_000        # whale transfer threshold
+NATIVE_RICH_CALLS = 60               # balancemulti calls per run (20 addr each)
+
+SCHEDULE.update({
+    "native_supply": 600,     # 10 min
+    "native_scan": 120,       # 2 min: forward block scan
+    "native_backfill": 300,   # 5 min: backward block scan
+    "native_wraps": 300,      # 5 min: WRBNT deposit/withdrawal
+    "native_rich": 1800,      # 30 min: richlist balances
+})
