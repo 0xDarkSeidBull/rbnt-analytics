@@ -216,36 +216,50 @@ def _ts(bn):
     return _ts_cache[bn]
 
 
-def wraps(max_blocks=150000):
+def _wrbnt_start_block():
+    """First block worth scanning: WRBNT contract creation (falls back to 1)."""
+    try:
+        res = routescan.api({"module": "contract", "action": "getcontractcreation",
+                             "contractaddresses": WRBNT})
+        r0 = res[0]
+        if r0.get("blockNumber"):
+            return int(r0["blockNumber"])
+        return int(w3().eth.get_transaction_receipt(r0["txHash"])["blockNumber"])
+    except Exception:
+        return 1
+
+
+def _hex0x(v):
+    s = ("0x" + v.hex()) if isinstance(v, (bytes, bytearray)) else str(v)
+    s = s if s.startswith("0x") else "0x" + s
+    return s.replace("0x0x", "0x").lower()
+
+
+def wraps(budget_secs=240, slice_blocks=20000):
     ensure_schema()
     t0 = time.time()
     head = w3().eth.block_number
     safe = head - 1600  # node serves logs for finalized range only
-    lo = int(db.meta_get("native_wrap_block") or 1)
-    if lo > safe:
-        return 0, "caught up", 0.0
-    hi = min(safe, lo + max_blocks - 1)
-    logs = get_logs_chunked(WRBNT.lower(), [[TOPIC_WRBNT_DEPOSIT, TOPIC_WRBNT_WITHDRAWAL]], lo, hi)
-    rows = []
-    for lg in logs:
-        t0h = lg["topics"][0]
-        t0h = ("0x" + t0h.hex()) if isinstance(t0h, (bytes, bytearray)) else str(t0h)
-        t0h = t0h if t0h.startswith("0x") else "0x" + t0h
-        kind = "wrap" if t0h.lower() == TOPIC_WRBNT_DEPOSIT else "unwrap"
-        t1 = lg["topics"][1]
-        t1 = t1.hex() if isinstance(t1, (bytes, bytearray)) else str(t1)
-        wallet = "0x" + t1[-40:].lower()
-        val = int.from_bytes(bytes(lg["data"]), "big")
-        txh = lg["transactionHash"]
-        txh = ("0x" + txh.hex()) if isinstance(txh, (bytes, bytearray)) else str(txh)
-        txh = txh if txh.startswith("0x") else "0x" + txh
-        rows.append((txh.lower(), lg["logIndex"], lg["blockNumber"], _ts(lg["blockNumber"]),
-                     kind, wallet, str(val), val / 1e18))
-    if rows:
-        db.exmany("""INSERT OR IGNORE INTO native_wraps(tx_hash,log_index,block,ts,kind,wallet,value_raw,value_rbnt)
-                     VALUES(?,?,?,?,?,?,?,?)""", rows)
-    db.meta_set("native_wrap_block", hi + 1)
-    return len(rows), f"blocks {lo}-{hi} events={len(rows)} remaining={max(0, safe - hi)}", time.time() - t0
+    cp = db.meta_get("native_wrap_block")
+    lo = int(cp) if cp else _wrbnt_start_block()
+    start, n = lo, 0
+    while lo <= safe and time.time() - t0 < budget_secs:
+        hi = min(safe, lo + slice_blocks - 1)
+        logs = get_logs_chunked(WRBNT.lower(), [[TOPIC_WRBNT_DEPOSIT, TOPIC_WRBNT_WITHDRAWAL]], lo, hi)
+        rows = []
+        for lg in logs:
+            kind = "wrap" if _hex0x(lg["topics"][0]) == TOPIC_WRBNT_DEPOSIT else "unwrap"
+            wallet = "0x" + _hex0x(lg["topics"][1])[-40:]
+            val = int.from_bytes(bytes(lg["data"]), "big")
+            rows.append((_hex0x(lg["transactionHash"]), lg["logIndex"], lg["blockNumber"],
+                         _ts(lg["blockNumber"]), kind, wallet, str(val), val / 1e18))
+        if rows:
+            db.exmany("""INSERT OR IGNORE INTO native_wraps(tx_hash,log_index,block,ts,kind,wallet,value_raw,value_rbnt)
+                         VALUES(?,?,?,?,?,?,?,?)""", rows)
+        n += len(rows)
+        db.meta_set("native_wrap_block", hi + 1)  # checkpoint every slice
+        lo = hi + 1
+    return n, f"blocks {start}-{lo - 1} events={n} remaining={max(0, safe - lo + 1)}", time.time() - t0
 
 
 # ---------------- richlist ----------------

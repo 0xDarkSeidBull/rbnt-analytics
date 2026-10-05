@@ -586,9 +586,9 @@ function renderBars(o) {
       return `<span style="color:${s.color || CHART_PALETTE[j % CHART_PALETTE.length]}">&#9679;</span> ${esc(s.label)}: <b>${NF0.format(v)}</b>`;
     }).join("<br>");
     if (horizontal) {
-      hits += `<rect class="vbar-hit" x="${padL}" y="${(base - 2).toFixed(1)}" width="${plotW}" height="${slot.toFixed(1)}" data-tip="<b>${esc(d.label)}</b><br>${tipLines}"></rect>`;
+      hits += `<rect class="vbar-hit" x="${padL}" y="${(base - 2).toFixed(1)}" width="${plotW}" height="${slot.toFixed(1)}" data-tip="${esc(`<b>${esc(d.label)}</b><br>${tipLines}`)}"></rect>`;
     } else {
-      hits += `<rect class="vbar-hit" x="${(padL + i * slot).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${plotH}" data-tip="<b>${esc(d.label)}</b><br>${tipLines}"></rect>`;
+      hits += `<rect class="vbar-hit" x="${(padL + i * slot).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${plotH}" data-tip="${esc(`<b>${esc(d.label)}</b><br>${tipLines}`)}"></rect>`;
     }
   });
   const svg = `<svg class="chart-svg" viewBox="0 0 ${W} ${H}">${grid}${rects}${hits}${labels}</svg>`;
