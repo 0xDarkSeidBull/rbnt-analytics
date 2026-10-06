@@ -586,9 +586,9 @@ function renderBars(o) {
       return `<span style="color:${s.color || CHART_PALETTE[j % CHART_PALETTE.length]}">&#9679;</span> ${esc(s.label)}: <b>${NF0.format(v)}</b>`;
     }).join("<br>");
     if (horizontal) {
-      hits += `<rect class="vbar-hit" x="${padL}" y="${(base - 2).toFixed(1)}" width="${plotW}" height="${slot.toFixed(1)}" data-tip="${esc(`<b>${esc(d.label)}</b><br>${tipLines}`)}"></rect>`;
+      hits += `<rect class="vbar-hit" x="${padL}" y="${(base - 2).toFixed(1)}" width="${plotW}" height="${slot.toFixed(1)}" data-tip="${esc(`<b>${esc(d.title || d.label)}</b><br>${tipLines}${d.addr ? "<br><span class=\"muted\">click to open wallet</span>" : ""}`)}"${d.addr ? ` data-addr="${esc(d.addr)}" style="cursor:pointer"` : ""}></rect>`;
     } else {
-      hits += `<rect class="vbar-hit" x="${(padL + i * slot).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${plotH}" data-tip="${esc(`<b>${esc(d.label)}</b><br>${tipLines}`)}"></rect>`;
+      hits += `<rect class="vbar-hit" x="${(padL + i * slot).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${plotH}" data-tip="${esc(`<b>${esc(d.title || d.label)}</b><br>${tipLines}${d.addr ? "<br><span class=\"muted\">click to open wallet</span>" : ""}`)}"${d.addr ? ` data-addr="${esc(d.addr)}" style="cursor:pointer"` : ""}></rect>`;
     }
   });
   const svg = `<svg class="chart-svg" viewBox="0 0 ${W} ${H}">${grid}${rects}${hits}${labels}</svg>`;
@@ -727,8 +727,12 @@ document.addEventListener("mouseover", e => {
 document.addEventListener("mousemove", e => {
   const tip = document.getElementById("chartTip");
   if (!tip || tip.hidden) return;
-  tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 240) + "px";
-  tip.style.top = (e.clientY + 14) + "px";
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + w > window.innerWidth - 8) x = e.clientX - w - 14;
+  if (y + h > window.innerHeight - 8) y = e.clientY - h - 14;
+  tip.style.left = Math.max(8, x) + "px";
+  tip.style.top = Math.max(8, y) + "px";
 });
 document.addEventListener("mouseout", e => {
   if (!e.target.closest || !e.target.closest(".chart-pt,.donut-seg,.vbar-hit")) return;
@@ -1038,18 +1042,18 @@ async function renderMega() {
     const distHost = document.getElementById("holderDist");
     if (distHost) {
       const wrbntTop = d.top_holders.slice(0, 10).map(h => ({
-        label: h.wallet.slice(0, 8), values: { v: Number(BigInt(h.balance_raw) / 10n ** 12n) / 1e6 } }));
+        label: h.wallet.slice(0, 8), title: h.wallet + (h.label ? " - " + h.label : ""), addr: h.wallet, values: { v: Number(BigInt(h.balance_raw) / 10n ** 12n) / 1e6 } }));
       const nativeTop = (((await api("/api/native/richlist?limit=10").catch(() => null)) || {}).holders || []).slice(0, 10).map(h => ({
-        label: h.wallet.slice(0, 8), values: { v: Number(BigInt(h.balance_raw) / 10n ** 12n) / 1e6 } }));
+        label: h.wallet.slice(0, 8), title: h.wallet + (h.label ? " - " + h.label : ""), addr: h.wallet, values: { v: Number(BigInt(h.balance_raw) / 10n ** 12n) / 1e6 } }));
       distHost.innerHTML =
         `<div class="grid cols-2">
           <div class="card"><h3>Top WRBNT holders - distribution</h3><div id="distW"></div></div>
           <div class="card"><h3>Top native RBNT holders - distribution</h3><div id="distN"></div></div>
         </div>`;
       document.getElementById("distW").innerHTML = renderBars({ data: wrbntTop,
-        series: [{ key: "v", label: "WRBNT (millions)", color: "#EF5350" }], height: 300 });
+        series: [{ key: "v", label: "WRBNT", color: "#EF5350" }], height: 300 });
       document.getElementById("distN").innerHTML = renderBars({ data: nativeTop,
-        series: [{ key: "v", label: "RBNT native (millions)", color: "#FCD34D" }], height: 300 });
+        series: [{ key: "v", label: "RBNT native", color: "#FCD34D" }], height: 300 });
     }
 
     /* searchable merged holders table */
@@ -1484,3 +1488,11 @@ async function boot() {
   }, REFRESH_MS);
 }
 window.addEventListener("DOMContentLoaded", boot);
+
+document.addEventListener("click", e => {
+  const el = e.target.closest && e.target.closest(".vbar-hit[data-addr]");
+  if (!el) return;
+  const tip = document.getElementById("chartTip");
+  if (tip) tip.hidden = true;
+  location.hash = "#/wallet/" + el.dataset.addr.toLowerCase();
+});
