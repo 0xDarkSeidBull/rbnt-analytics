@@ -235,7 +235,24 @@ def _hex0x(v):
     return s.replace("0x0x", "0x").lower()
 
 
-def wraps(budget_secs=240, slice_blocks=20000):
+def _prefetch_ts(blocks):
+    """Fill _ts_cache for many blocks with batched header calls (50 per request)."""
+    need = sorted({b for b in blocks if b not in _ts_cache})
+    for i in range(0, len(need), 50):
+        chunk = need[i:i + 50]
+        payload = [{"jsonrpc": "2.0", "id": b, "method": "eth_getBlockByNumber",
+                    "params": [hex(b), False]} for b in chunk]
+        try:
+            j = _session.post(RPC_URL, json=payload, timeout=60).json()
+            if isinstance(j, list):
+                for x in j:
+                    if x.get("result"):
+                        _ts_cache[x["id"]] = int(x["result"]["timestamp"], 16)
+        except Exception:
+            pass  # _ts() falls back to single calls for anything missing
+
+
+def wraps(budget_secs=240, slice_blocks=5000):
     ensure_schema()
     t0 = time.time()
     head = w3().eth.block_number
@@ -246,6 +263,9 @@ def wraps(budget_secs=240, slice_blocks=20000):
     while lo <= safe and time.time() - t0 < budget_secs:
         hi = min(safe, lo + slice_blocks - 1)
         logs = get_logs_chunked(WRBNT.lower(), [[TOPIC_WRBNT_DEPOSIT, TOPIC_WRBNT_WITHDRAWAL]], lo, hi)
+        if len(_ts_cache) > 20000:
+            _ts_cache.clear()
+        _prefetch_ts([lg["blockNumber"] for lg in logs])
         rows = []
         for lg in logs:
             kind = "wrap" if _hex0x(lg["topics"][0]) == TOPIC_WRBNT_DEPOSIT else "unwrap"
