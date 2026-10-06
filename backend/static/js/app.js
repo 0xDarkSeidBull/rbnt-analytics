@@ -1039,7 +1039,7 @@ async function renderMega() {
     if (distHost) {
       const wrbntTop = d.top_holders.slice(0, 10).map(h => ({
         label: h.wallet.slice(0, 8), values: { v: Number(BigInt(h.balance_raw) / 10n ** 12n) / 1e6 } }));
-      const nativeTop = (d.native_holders || []).slice(0, 10).map(h => ({
+      const nativeTop = (((await api("/api/native/richlist?limit=10").catch(() => null)) || {}).holders || []).slice(0, 10).map(h => ({
         label: h.wallet.slice(0, 8), values: { v: Number(BigInt(h.balance_raw) / 10n ** 12n) / 1e6 } }));
       distHost.innerHTML =
         `<div class="grid cols-2">
